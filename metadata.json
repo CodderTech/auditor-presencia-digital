@@ -1,0 +1,6 @@
+{
+  "name": "B2B Digital Presence Auditor & Prospector CLI",
+  "description": "Herramienta CLI modular y pipeline de prospección B2B automatizada con Playwright, PageSpeed Insights y visión multimodal de Gemini 2.5 Flash.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
