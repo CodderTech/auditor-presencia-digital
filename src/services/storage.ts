@@ -45,6 +45,10 @@ export class StorageService {
         category TEXT NOT NULL,
         address TEXT,
         phone TEXT,
+        phones TEXT,
+        email TEXT,
+        instagram TEXT,
+        facebook TEXT,
         website_url TEXT,
         rating REAL,
         user_ratings_total INTEGER,
@@ -57,6 +61,12 @@ export class StorageService {
         created_at TEXT
       );
     `);
+
+    // Migraciones seguras para bases de datos existentes
+    try { this.db.run('ALTER TABLE qualified_leads ADD COLUMN phones TEXT;'); } catch (e) {}
+    try { this.db.run('ALTER TABLE qualified_leads ADD COLUMN email TEXT;'); } catch (e) {}
+    try { this.db.run('ALTER TABLE qualified_leads ADD COLUMN instagram TEXT;'); } catch (e) {}
+    try { this.db.run('ALTER TABLE qualified_leads ADD COLUMN facebook TEXT;'); } catch (e) {}
 
     this.persistToDisk();
   }
@@ -78,12 +88,14 @@ export class StorageService {
 
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO qualified_leads (
-        id, name, category, address, phone, website_url,
+        id, name, category, address, phone, phones, email, instagram, facebook, website_url,
         rating, user_ratings_total, pagespeed_score, lcp_seconds,
         defectos_principales, resumen_critica, pitch_mensaje,
         screenshot_path, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+
+    const phonesToSave = lead.phones && lead.phones.length > 0 ? lead.phones : (lead.phone ? [lead.phone] : []);
 
     stmt.run([
       lead.id,
@@ -91,6 +103,10 @@ export class StorageService {
       lead.category,
       lead.address || '',
       lead.phone || '',
+      JSON.stringify(phonesToSave),
+      lead.email || '',
+      lead.instagram || '',
+      lead.facebook || '',
       lead.website_url || '',
       lead.rating || 0,
       lead.user_ratings_total || 0,
@@ -125,13 +141,26 @@ export class StorageService {
         defectos = [];
       }
 
+      let phones: string[] = [];
+      try {
+        if (row.phones) {
+          phones = typeof row.phones === 'string' ? JSON.parse(row.phones) : row.phones;
+        }
+      } catch (e) {
+        phones = row.phone ? [String(row.phone)] : [];
+      }
+
       leads.push({
         id: String(row.id),
         name: String(row.name),
         category: row.category as any,
-        address: String(row.address),
-        phone: String(row.phone),
-        website_url: String(row.website_url),
+        address: String(row.address || ''),
+        phone: String(row.phone || ''),
+        phones: Array.isArray(phones) && phones.length > 0 ? phones : (row.phone ? [String(row.phone)] : []),
+        email: row.email ? String(row.email) : undefined,
+        instagram: row.instagram ? String(row.instagram) : undefined,
+        facebook: row.facebook ? String(row.facebook) : undefined,
+        website_url: String(row.website_url || ''),
         rating: Number(row.rating),
         user_ratings_total: Number(row.user_ratings_total),
         pagespeed_score: row.pagespeed_score !== null ? Number(row.pagespeed_score) : undefined,
@@ -156,8 +185,12 @@ export class StorageService {
       'ID',
       'Nombre',
       'Categoria',
-      'Telefono',
       'Direccion',
+      'Telefono',
+      'Telefonos',
+      'Email',
+      'Instagram',
+      'Facebook',
       'SitioWeb',
       'Rating',
       'TotalReseñas',
@@ -169,12 +202,18 @@ export class StorageService {
       'Fecha',
     ];
 
+    const phonesList = lead.phones && lead.phones.length > 0 ? lead.phones : (lead.phone ? [lead.phone] : []);
+
     const row = [
       lead.id,
       lead.name,
       lead.category,
-      lead.phone || '',
       lead.address || '',
+      lead.phone || '',
+      phonesList.join('; '),
+      lead.email || '',
+      lead.instagram || '',
+      lead.facebook || '',
       lead.website_url || '',
       String(lead.rating || 0),
       String(lead.user_ratings_total || 0),
@@ -198,7 +237,9 @@ export class StorageService {
     if (!exists) {
       fs.writeFileSync(csvFile, headers.join(',') + '\n' + csvRow, 'utf8');
     } else {
-      fs.appendFileSync(csvFile, csvRow, 'utf8');
+      const existingContent = fs.readFileSync(csvFile, 'utf8');
+      const prefix = existingContent.length > 0 && !existingContent.endsWith('\n') ? '\n' : '';
+      fs.appendFileSync(csvFile, prefix + csvRow, 'utf8');
     }
   }
 
@@ -208,8 +249,12 @@ export class StorageService {
       'ID',
       'Nombre',
       'Categoria',
-      'Telefono',
       'Direccion',
+      'Telefono',
+      'Telefonos',
+      'Email',
+      'Instagram',
+      'Facebook',
       'SitioWeb',
       'Rating',
       'TotalReseñas',
@@ -229,12 +274,17 @@ export class StorageService {
     };
 
     const rows = leads.map((lead) => {
+      const phonesList = lead.phones && lead.phones.length > 0 ? lead.phones : (lead.phone ? [lead.phone] : []);
       return [
         lead.id,
         lead.name,
         lead.category,
-        lead.phone || '',
         lead.address || '',
+        lead.phone || '',
+        phonesList.join('; '),
+        lead.email || '',
+        lead.instagram || '',
+        lead.facebook || '',
         lead.website_url || '',
         String(lead.rating || 0),
         String(lead.user_ratings_total || 0),

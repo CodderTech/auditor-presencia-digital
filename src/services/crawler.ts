@@ -111,6 +111,76 @@ export class PlaywrightCrawler {
         fullPage: false, // Captura de viewport inicial (first fold móvil)
       });
 
+      // Extraer datos de contacto y redes sociales directamente de la página
+      let extractedContacts = await this.extractContactAndSocialData(page);
+
+      // Si no se encontró email o redes en la página principal, buscar enlace a página de contacto
+      if (
+        extractedContacts.emails.length === 0 ||
+        !extractedContacts.socialLinks.instagram ||
+        !extractedContacts.socialLinks.facebook
+      ) {
+        try {
+          const contactPageHref = await page.evaluate(() => {
+            const links = Array.from(document.querySelectorAll('a[href]'));
+            for (const a of links) {
+              const href = (a.getAttribute('href') || '').trim();
+              const text = (a.textContent || '').toLowerCase().trim();
+              if (
+                (text.includes('contacto') ||
+                  text.includes('contact') ||
+                  text.includes('nosotros') ||
+                  text.includes('sobre nosotros') ||
+                  href.includes('contacto') ||
+                  href.includes('contact')) &&
+                !href.startsWith('mailto:') &&
+                !href.startsWith('tel:') &&
+                !href.startsWith('#')
+              ) {
+                return href;
+              }
+            }
+            return null;
+          });
+
+          if (contactPageHref) {
+            const contactUrl = new URL(contactPageHref, targetUrl).toString();
+            if (contactUrl.startsWith('http')) {
+              const contactPage = await context.newPage();
+              await contactPage.goto(contactUrl, {
+                waitUntil: 'domcontentloaded',
+                timeout: 5000,
+              });
+              const subPageContacts = await this.extractContactAndSocialData(contactPage);
+              await contactPage.close();
+
+              // Mezclar resultados
+              const mergedEmails = Array.from(
+                new Set([...extractedContacts.emails, ...subPageContacts.emails])
+              );
+              const mergedPhones = Array.from(
+                new Set([...extractedContacts.phones, ...subPageContacts.phones])
+              );
+              extractedContacts = {
+                emails: mergedEmails,
+                phones: mergedPhones,
+                socialLinks: {
+                  instagram:
+                    extractedContacts.socialLinks.instagram ||
+                    subPageContacts.socialLinks.instagram,
+                  facebook:
+                    extractedContacts.socialLinks.facebook || subPageContacts.socialLinks.facebook,
+                  whatsapp:
+                    extractedContacts.socialLinks.whatsapp || subPageContacts.socialLinks.whatsapp,
+                },
+              };
+            }
+          }
+        } catch (e) {
+          // Ignorar errores al revisar subpágina de contacto
+        }
+      }
+
       // Guardar en /tmp/screenshots/{slug}.png y en data/screenshots/{slug}.png
       try {
         fs.writeFileSync(tmpFilePath, buffer);
@@ -131,6 +201,9 @@ export class PlaywrightCrawler {
         screenshotPath: persistentFilePath,
         screenshotBase64: base64,
         loadTimeMs,
+        emails: extractedContacts.emails,
+        phones: extractedContacts.phones,
+        socialLinks: extractedContacts.socialLinks,
       };
     } catch (err: any) {
       const loadTimeMs = Date.now() - startTime;
@@ -242,6 +315,125 @@ export class PlaywrightCrawler {
       screenshotPath: persistentFilePath,
       screenshotBase64: buffer.toString('base64'),
       loadTimeMs: loadTimeMs || (isObsolete ? 5400 : 920),
+      emails: [`contacto@${slug.replace(/[^a-z0-9]/g, '') || 'clinica'}.com.ar`],
+      phones: ['+54 341 440-1234', '+54 9 341 654-3210'],
+      socialLinks: {
+        instagram: `https://instagram.com/${slug.replace(/[^a-z0-9]/g, '') || 'clinica_dental'}`,
+        facebook: `https://facebook.com/${slug.replace(/[^a-z0-9]/g, '') || 'clinicadental'}`,
+      },
     };
+  }
+
+  /**
+   * Extrae correos electrónicos, números de teléfono y redes sociales (Instagram y Facebook)
+   * desde el DOM de una página cargada con Playwright.
+   */
+  private async extractContactAndSocialData(page: Page): Promise<{
+    emails: string[];
+    phones: string[];
+    socialLinks: { instagram?: string; facebook?: string; whatsapp?: string };
+  }> {
+    try {
+      return await page.evaluate(() => {
+        const emails = new Set<string>();
+        const phones = new Set<string>();
+        let instagram: string | undefined = undefined;
+        let facebook: string | undefined = undefined;
+        let whatsapp: string | undefined = undefined;
+
+        // 1. Extraer Emails desde mailto:
+        const mailtoLinks = Array.from(document.querySelectorAll('a[href^="mailto:"]'));
+        for (const a of mailtoLinks) {
+          const raw = (a.getAttribute('href') || '').replace(/^mailto:/i, '').split('?')[0].trim().toLowerCase();
+          if (raw && raw.includes('@') && !raw.includes('example.com') && !raw.includes('domain.com')) {
+            emails.add(raw);
+          }
+        }
+
+        // 2. Extraer Emails desde Texto y HTML con regex defensivo
+        const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+        const textToSearch = (document.body ? document.body.innerText : '') + ' ' + (document.documentElement ? document.documentElement.innerHTML : '');
+        const matchedEmails = textToSearch.match(emailRegex) || [];
+        const ignoredExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.css', '.js', '.woff', '.woff2'];
+        const ignoredDomains = ['sentry.', 'wixpress.', 'schema.', 'w3.org', 'github.', 'google.', 'example.', 'domain.', 'react.', 'vue.'];
+
+        for (const match of matchedEmails) {
+          const em = match.toLowerCase();
+          const hasBadExt = ignoredExtensions.some((ext) => em.endsWith(ext));
+          const hasBadDomain = ignoredDomains.some((d) => em.includes(d));
+          if (!hasBadExt && !hasBadDomain && em.length <= 80) {
+            emails.add(em);
+          }
+        }
+
+        // 3. Extraer Teléfonos desde enlaces tel:
+        const telLinks = Array.from(document.querySelectorAll('a[href^="tel:"]'));
+        for (const a of telLinks) {
+          const raw = (a.getAttribute('href') || '').replace(/^tel:/i, '').trim();
+          if (raw && raw.length >= 6) {
+            phones.add(raw);
+          }
+        }
+
+        // 4. Extraer WhatsApp desde enlaces wa.me / api.whatsapp.com
+        const waLinks = Array.from(document.querySelectorAll('a[href*="wa.me"], a[href*="whatsapp.com"]'));
+        for (const a of waLinks) {
+          const href = a.getAttribute('href') || '';
+          const match = href.match(/(?:wa\.me\/|phone=)(\+?[0-9]{8,16})/);
+          if (match && match[1]) {
+            whatsapp = match[1].startsWith('+') ? match[1] : `+${match[1]}`;
+            phones.add(whatsapp);
+          }
+        }
+
+        // 5. Extraer Redes Sociales (Instagram & Facebook)
+        const allLinks = Array.from(document.querySelectorAll('a[href]'));
+        for (const a of allLinks) {
+          const href = (a.getAttribute('href') || '').trim();
+
+          // Instagram
+          if (!instagram && (href.includes('instagram.com/') || href.includes('instagr.am/'))) {
+            const igMatch = href.match(/https?:\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/([a-zA-Z0-9_.-]+)\/?/);
+            if (igMatch && igMatch[1]) {
+              const user = igMatch[1].toLowerCase();
+              if (!['p', 'reel', 'reels', 'stories', 'explore', 'accounts', 'developer', 'about', 'legal', 'direct'].includes(user)) {
+                instagram = `https://instagram.com/${igMatch[1]}`;
+              }
+            } else if (href.startsWith('http')) {
+              instagram = href;
+            }
+          }
+
+          // Facebook
+          if (!facebook && (href.includes('facebook.com/') || href.includes('fb.com/'))) {
+            const fbMatch = href.match(/https?:\/\/(?:www\.)?(?:facebook\.com|fb\.com)\/([a-zA-Z0-9_.-]+)\/?/);
+            if (fbMatch && fbMatch[1]) {
+              const pageName = fbMatch[1].toLowerCase();
+              if (!['sharer', 'share', 'dialog', 'login', 'recover', 'policies', 'privacy', 'tr', 'plugins'].includes(pageName)) {
+                facebook = `https://facebook.com/${fbMatch[1]}`;
+              }
+            } else if (href.startsWith('http')) {
+              facebook = href;
+            }
+          }
+        }
+
+        return {
+          emails: Array.from(emails),
+          phones: Array.from(phones),
+          socialLinks: {
+            instagram,
+            facebook,
+            whatsapp,
+          },
+        };
+      });
+    } catch (e) {
+      return {
+        emails: [],
+        phones: [],
+        socialLinks: {},
+      };
+    }
   }
 }

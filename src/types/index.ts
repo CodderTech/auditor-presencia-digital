@@ -15,6 +15,10 @@ export interface PlaceBusiness {
   rating?: number;
   user_ratings_total?: number;
   types?: string[];
+  email?: string;
+  phones?: string[];
+  instagram?: string;
+  facebook?: string;
 }
 
 export interface GeminiVisionAudit {
@@ -32,6 +36,13 @@ export interface CrawlResult {
   screenshotPath?: string;
   screenshotBase64?: string;
   loadTimeMs?: number;
+  emails?: string[];
+  phones?: string[];
+  socialLinks?: {
+    instagram?: string;
+    facebook?: string;
+    whatsapp?: string;
+  };
 }
 
 export interface PageSpeedResult {
@@ -46,6 +57,10 @@ export interface QualifiedLead {
   category: LeadCategory;
   address: string;
   phone: string;
+  phones?: string[];
+  email?: string;
+  instagram?: string;
+  facebook?: string;
   website_url: string;
   rating: number;
   user_ratings_total: number;

@@ -1,0 +1,25 @@
+<svg width="390" height="844" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100%" height="100%" fill="#E0E4E8"/>
+          <!-- Header 2008 style -->
+          <rect width="100%" height="80" fill="#003366"/>
+          <text x="20" y="45" font-family="Times New Roman, serif" font-size="22" font-weight="bold" fill="#FFFF00">Clinica Odontologica</text>
+          <text x="20" y="70" font-family="Arial" font-size="11" fill="#FFFFFF">Bienvenidos a nuestro sitio web oficial (Actualizado 2012)</text>
+          
+          <!-- Banner anticuado -->
+          <rect x="15" y="100" width="360" height="140" fill="#CCCCCC" stroke="#888888"/>
+          <text x="30" y="150" font-family="Courier New" font-size="14" fill="#333333">Servicios Dentales:</text>
+          <text x="30" y="175" font-family="Courier New" font-size="13" fill="#666666">- Extracciones</text>
+          <text x="30" y="195" font-family="Courier New" font-size="13" fill="#666666">- Arreglos con amalgama</text>
+
+          <!-- Texto denso y superpuesto sin botón de WhatsApp -->
+          <text x="20" y="275" font-family="Times New Roman" font-size="15" fill="#111111">Llamar en horario de comercio al tel fijo:</text>
+          <text x="20" y="300" font-family="Times New Roman" font-size="18" fill="#AA0000" font-weight="bold">Tel: (0341) 440-1234</text>
+          <rect x="20" y="325" width="350" height="180" fill="#FFFFFF" stroke="#999999"/>
+          <text x="30" y="355" font-family="Arial" font-size="12" fill="#555555">Atencion exclusiva por orden de llegada.</text>
+          <text x="30" y="375" font-family="Arial" font-size="11" fill="#777777">No contamos con turnero online ni WhatsApp.</text>
+          <text x="30" y="410" font-family="Arial" font-size="11" fill="#999999">Optimizado para Internet Explorer 8 (Resolución 1024x768)</text>
+
+          <!-- Footer roto -->
+          <rect y="760" width="100%" height="84" fill="#222222"/>
+          <text x="50" y="805" font-family="Arial" font-size="10" fill="#AAAAAA">Copyright 2011 - Todos los derechos reservados</text>
+        </svg>

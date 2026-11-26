@@ -23,6 +23,13 @@ import {
   Building2,
   Eye,
   X,
+  Mail,
+  Phone,
+  MapPin,
+  Instagram,
+  Facebook,
+  ClipboardCopy,
+  ClipboardCheck,
 } from 'lucide-react';
 import { QualifiedLead, PipelineStats, PipelineLogMessage, LeadCategory } from './types/index.ts';
 
@@ -189,6 +196,124 @@ export default function App() {
     setTimeout(() => setCopiedId(null), 2500);
   };
 
+  /**
+   * Genera el texto estructurado completo de un negocio para copiarlo al portapapeles en 1 clic.
+   */
+  const buildBusinessCopyText = (lead: QualifiedLead): string => {
+    const phonesList =
+      lead.phones && lead.phones.length > 0
+        ? lead.phones.join(', ')
+        : lead.phone || 'No detectado';
+
+    let webStatus = '';
+    switch (lead.category) {
+      case 'SIN_WEB':
+        webStatus = '❌ Sin sitio web propio (solo figura en Google Maps)';
+        break;
+      case 'SOLO_RED_SOCIAL':
+        webStatus = `📱 Solo Red Social (deriva a ${lead.website_url || 'red social'}, sin web propia)`;
+        break;
+      case 'WEB_CAIDA':
+        webStatus = `⚠️ Sitio web con error SSL o caído (${lead.website_url})`;
+        break;
+      case 'OBSOLETO_CONTACTAR':
+        webStatus = `⚠️ Sitio web obsoleto / no optimizado para celulares (${lead.website_url})`;
+        break;
+      case 'PROFESIONAL_DESCARTAR':
+        webStatus = `✅ Sitio web moderno y profesional (${lead.website_url})`;
+        break;
+      default:
+        webStatus = lead.website_url ? `🌐 ${lead.website_url}` : '❌ Sin sitio web propio';
+    }
+
+    const lines = [
+      `🏢 NEGOCIO: ${lead.name}`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `📍 Dirección: ${lead.address || 'No informada'}`,
+      `📞 Teléfono(s): ${phonesList}`,
+      `✉️ Email: ${lead.email || 'No detectado'}`,
+      `🌐 Presencia Web: ${webStatus}`,
+      `📸 Instagram: ${lead.instagram || 'No detectado'}`,
+      `👥 Facebook: ${lead.facebook || 'No detectado'}`,
+      ``,
+      `🔍 ANÁLISIS DE PRESENCIA DIGITAL:`,
+      `• Diagnóstico: ${lead.resumen_critica || 'Evaluado por auditor'}`,
+    ];
+
+    if (lead.pagespeed_score !== undefined) {
+      lines.push(
+        `• Rendimiento móvil (PageSpeed): ${lead.pagespeed_score}/100${
+          lead.lcp_seconds !== undefined ? ` (LCP: ${lead.lcp_seconds}s)` : ''
+        }`
+      );
+    }
+
+    if (lead.defectos_principales && lead.defectos_principales.length > 0) {
+      lines.push(`• Defectos detectados: ${lead.defectos_principales.join('; ')}`);
+    }
+
+    if (lead.pitch_mensaje) {
+      lines.push(``);
+      lines.push(`💬 MENSAJE / PITCH DE CONTACTO:`);
+      lines.push(`"${lead.pitch_mensaje}"`);
+    }
+
+    return lines.join('\n');
+  };
+
+  /**
+   * Genera el texto estructurado del resultado de una auditoría individual.
+   */
+  const buildSingleAuditCopyText = (result: any, name: string, url: string): string => {
+    const contacts = result.contacts || {};
+    const emails = contacts.emails?.length > 0 ? contacts.emails.join(', ') : 'No detectado';
+    const phones = contacts.phones?.length > 0 ? contacts.phones.join(', ') : 'No detectado';
+    const ig = contacts.socialLinks?.instagram || 'No detectado';
+    const fb = contacts.socialLinks?.facebook || 'No detectado';
+
+    let webStatus = '';
+    if (result.category === 'WEB_CAIDA') {
+      webStatus = `❌ Sitio web caído o con error SSL (${url})`;
+    } else if (result.category === 'OBSOLETO_CONTACTAR') {
+      webStatus = `⚠️ Sitio web obsoleto / requiere renovación (${url})`;
+    } else if (result.category === 'PROFESIONAL_DESCARTAR') {
+      webStatus = `✅ Sitio web moderno y profesional (${url})`;
+    } else {
+      webStatus = `🌐 ${url}`;
+    }
+
+    const lines = [
+      `🏢 NEGOCIO AUDITADO: ${name}`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `🌐 Presencia Web: ${webStatus}`,
+      `📞 Teléfono(s): ${phones}`,
+      `✉️ Email: ${emails}`,
+      `📸 Instagram: ${ig}`,
+      `👥 Facebook: ${fb}`,
+      ``,
+      `🔍 ANÁLISIS DE PRESENCIA DIGITAL:`,
+      `• Diagnóstico: ${result.visionAudit?.resumen_critica || result.critica || 'Evaluado por auditor'}`,
+    ];
+
+    if (result.pagespeedResult) {
+      lines.push(
+        `• PageSpeed móvil: ${result.pagespeedResult.score}/100 (LCP: ${result.pagespeedResult.lcpSeconds}s)`
+      );
+    }
+
+    if (result.visionAudit?.defectos_principales?.length > 0) {
+      lines.push(`• Defectos detectados: ${result.visionAudit.defectos_principales.join('; ')}`);
+    }
+
+    if (result.pitch) {
+      lines.push(``);
+      lines.push(`💬 MENSAJE / PITCH DE CONTACTO:`);
+      lines.push(`"${result.pitch}"`);
+    }
+
+    return lines.join('\n');
+  };
+
   const runSingleAudit = async () => {
     if (!singleUrl) return;
     setIsAuditingSingle(true);
@@ -216,8 +341,12 @@ export default function App() {
       const q = searchFilter.toLowerCase();
       return (
         lead.name.toLowerCase().includes(q) ||
-        lead.address.toLowerCase().includes(q) ||
-        lead.phone.toLowerCase().includes(q) ||
+        (lead.address && lead.address.toLowerCase().includes(q)) ||
+        (lead.phone && lead.phone.toLowerCase().includes(q)) ||
+        (lead.email && lead.email.toLowerCase().includes(q)) ||
+        (lead.instagram && lead.instagram.toLowerCase().includes(q)) ||
+        (lead.facebook && lead.facebook.toLowerCase().includes(q)) ||
+        (lead.phones && lead.phones.some((p) => p.toLowerCase().includes(q))) ||
         (lead.website_url && lead.website_url.toLowerCase().includes(q))
       );
     }
@@ -719,19 +848,36 @@ export default function App() {
                     >
                       {/* Card Header */}
                       <div className="p-4 border-b border-slate-800/80 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <h4 className="font-bold text-white text-sm truncate" title={lead.name}>
                             {lead.name}
                           </h4>
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5">{lead.address}</p>
+                          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-1 truncate" title={lead.address}>
+                            <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
+                            <span className="truncate">{lead.address || 'Sin dirección registrada'}</span>
+                          </p>
                         </div>
-                        {getCategoryBadge(lead.category)}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {getCategoryBadge(lead.category)}
+                          <button
+                            onClick={() => copyToClipboard(buildBusinessCopyText(lead), `full-${lead.id}`)}
+                            className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-cyan-950/60 hover:text-cyan-300 text-slate-400 border border-slate-700/60 transition"
+                            title="Copiar todos los datos de este negocio en 1 clic"
+                          >
+                            {copiedId === `full-${lead.id}` ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <ClipboardCopy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
                       </div>
 
                       {/* Card Body */}
                       <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-                        {/* Audit Details */}
-                        <div className="space-y-2 text-xs">
+                        {/* Audit & Contact Details */}
+                        <div className="space-y-3 text-xs">
+                          {/* Fila de Sitio Web */}
                           {lead.website_url ? (
                             <div className="flex items-center gap-1.5 text-slate-400">
                               <Globe className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -750,6 +896,102 @@ export default function App() {
                               <span>Sin sitio web propio registrado en Google Maps</span>
                             </div>
                           )}
+
+                          {/* Caja de Datos de Contacto y Redes Sociales */}
+                          <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 space-y-2">
+                            {/* Teléfonos */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              {lead.phones && lead.phones.length > 0 ? (
+                                lead.phones.map((p, pIdx) => (
+                                  <a
+                                    key={pIdx}
+                                    href={`tel:${p.replace(/\s+/g, '')}`}
+                                    className="font-mono text-[11px] text-emerald-400 hover:underline bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-800/40"
+                                    title="Llamar o agregar teléfono"
+                                  >
+                                    {p}
+                                  </a>
+                                ))
+                              ) : lead.phone ? (
+                                <a
+                                  href={`tel:${lead.phone.replace(/\s+/g, '')}`}
+                                  className="font-mono text-[11px] text-emerald-400 hover:underline bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-800/40"
+                                >
+                                  {lead.phone}
+                                </a>
+                              ) : (
+                                <span className="text-[11px] text-slate-500 italic">Sin teléfono registrado</span>
+                              )}
+                            </div>
+
+                            {/* Email */}
+                            <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Mail className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                {lead.email ? (
+                                  <a
+                                    href={`mailto:${lead.email}`}
+                                    className="text-[11px] text-cyan-400 hover:underline truncate font-medium"
+                                    title={lead.email}
+                                  >
+                                    {lead.email}
+                                  </a>
+                                ) : (
+                                  <span className="text-[11px] text-slate-500 italic">Sin correo detectado</span>
+                                )}
+                              </div>
+                              {lead.email && (
+                                <button
+                                  onClick={() => copyToClipboard(lead.email!, `email-${lead.id}`)}
+                                  className="text-[10px] text-slate-400 hover:text-white shrink-0 px-1.5 py-0.5 rounded bg-slate-800 transition flex items-center gap-1"
+                                  title="Copiar correo"
+                                >
+                                  {copiedId === `email-${lead.id}` ? (
+                                    <>
+                                      <Check className="w-2.5 h-2.5 text-emerald-400" /> Copiado
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-2.5 h-2.5" /> Copiar
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Redes Sociales (Instagram y Facebook) */}
+                            <div className="flex items-center gap-2 pt-1 border-t border-slate-800/60">
+                              <span className="text-[10px] text-slate-400 uppercase font-semibold">Redes:</span>
+                              {lead.instagram ? (
+                                <a
+                                  href={lead.instagram}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-fuchsia-400 bg-fuchsia-950/40 hover:bg-fuchsia-900/50 border border-fuchsia-800/40 px-2 py-0.5 rounded-lg transition"
+                                  title={lead.instagram}
+                                >
+                                  <Instagram className="w-3 h-3 text-fuchsia-400" /> Instagram
+                                </a>
+                              ) : (
+                                <span className="text-[10px] text-slate-600">IG: -</span>
+                              )}
+
+                              {lead.facebook ? (
+                                <a
+                                  href={lead.facebook}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-400 bg-blue-950/40 hover:bg-blue-900/50 border border-blue-800/40 px-2 py-0.5 rounded-lg transition"
+                                  title={lead.facebook}
+                                >
+                                  <Facebook className="w-3 h-3 text-blue-400" /> Facebook
+                                </a>
+                              ) : (
+                                <span className="text-[10px] text-slate-600">FB: -</span>
+                              )}
+                            </div>
+                          </div>
 
                           {lead.pagespeed_score !== undefined && (
                             <div className="flex items-center gap-4 pt-1">
@@ -821,21 +1063,44 @@ export default function App() {
 
                         {/* Actions */}
                         <div className="pt-2 flex items-center gap-2">
+                          <button
+                            onClick={() => copyToClipboard(buildBusinessCopyText(lead), `full-${lead.id}`)}
+                            className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm"
+                            title="Copiar todos los datos de contacto y análisis en 1 clic"
+                          >
+                            {copiedId === `full-${lead.id}` ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-white" /> ¡Ficha Copiada!
+                              </>
+                            ) : (
+                              <>
+                                <ClipboardCopy className="w-3.5 h-3.5 text-white" /> Copiar Ficha Completa
+                              </>
+                            )}
+                          </button>
+
                           {waUrl ? (
                             <a
                               href={waUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+                              title="Abrir WhatsApp"
                             >
-                              <MessageCircle className="w-3.5 h-3.5" /> Enviar por WhatsApp
+                              <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                             </a>
                           ) : (
                             <button
                               onClick={() => copyToClipboard(lead.pitch_mensaje, lead.id)}
-                              className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+                              title="Copiar pitch"
                             >
-                              <Copy className="w-3.5 h-3.5" /> Copiar Pitch
+                              {copiedId === lead.id ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                              <span>Pitch</span>
                             </button>
                           )}
                         </div>
@@ -954,6 +1219,56 @@ export default function App() {
                       </div>
                     )}
 
+                    {/* Datos de Contacto y Redes Extraídos en Auditoría Individual */}
+                    {(singleResult.contacts?.emails?.length > 0 ||
+                      singleResult.contacts?.phones?.length > 0 ||
+                      singleResult.contacts?.socialLinks?.instagram ||
+                      singleResult.contacts?.socialLinks?.facebook) && (
+                      <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2 text-xs">
+                        <span className="text-xs font-semibold text-cyan-400 block">
+                          Datos de Contacto y Redes Detectados:
+                        </span>
+                        {singleResult.contacts?.emails?.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-slate-300">
+                            <Mail className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                            <span className="text-cyan-400 font-medium">
+                              {singleResult.contacts.emails.join(', ')}
+                            </span>
+                          </div>
+                        )}
+                        {singleResult.contacts?.phones?.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-slate-300 flex-wrap">
+                            <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="text-emerald-400 font-mono">
+                              {singleResult.contacts.phones.join(', ')}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 pt-1 border-t border-slate-800/60 text-[11px] flex-wrap">
+                          {singleResult.contacts?.socialLinks?.instagram && (
+                            <a
+                              href={singleResult.contacts.socialLinks.instagram}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-fuchsia-400 hover:underline"
+                            >
+                              <Instagram className="w-3 h-3" /> Instagram
+                            </a>
+                          )}
+                          {singleResult.contacts?.socialLinks?.facebook && (
+                            <a
+                              href={singleResult.contacts.socialLinks.facebook}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-400 hover:underline"
+                            >
+                              <Facebook className="w-3 h-3" /> Facebook
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {singleResult.visionAudit && (
                       <div className="space-y-2">
                         <span className="text-xs font-semibold text-slate-300 block">Dictamen de Gemini Visión:</span>
@@ -985,13 +1300,37 @@ export default function App() {
                               </>
                             ) : (
                               <>
-                                <Copy className="w-3.5 h-3.5" /> Copiar Pitch
+                                <Copy className="w-3.5 h-3.5" /> Copiar Solo Pitch
                               </>
                             )}
                           </button>
                         </div>
                       </div>
                     )}
+
+                    {/* Botón Copiar Ficha Completa del Resultado Individual */}
+                    <div className="pt-1">
+                      <button
+                        onClick={() =>
+                          copyToClipboard(
+                            buildSingleAuditCopyText(singleResult, singleName, singleUrl),
+                            'single-full'
+                          )
+                        }
+                        className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-md"
+                        title="Copiar todos los datos de contacto y análisis del negocio en 1 clic"
+                      >
+                        {copiedId === 'single-full' ? (
+                          <>
+                            <Check className="w-4 h-4 text-white" /> ¡Ficha y Análisis Copiados!
+                          </>
+                        ) : (
+                          <>
+                            <ClipboardCopy className="w-4 h-4 text-white" /> Copiar Ficha y Análisis Completo
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1038,7 +1377,10 @@ export default function App() {
                     <tr>
                       <th className="p-3.5">Nombre</th>
                       <th className="p-3.5">Categoría</th>
-                      <th className="p-3.5">Teléfono</th>
+                      <th className="p-3.5">Dirección</th>
+                      <th className="p-3.5">Teléfonos</th>
+                      <th className="p-3.5">Email</th>
+                      <th className="p-3.5">Redes</th>
                       <th className="p-3.5">Sitio Web</th>
                       <th className="p-3.5">PageSpeed</th>
                       <th className="p-3.5">Diagnóstico</th>
@@ -1048,17 +1390,62 @@ export default function App() {
                   <tbody className="divide-y divide-slate-800/60 font-sans">
                     {leads.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-8 text-center text-slate-500">
+                        <td colSpan={10} className="p-8 text-center text-slate-500">
                           La base de datos SQLite no contiene registros actualmente.
                         </td>
                       </tr>
                     ) : (
                       leads.map((l) => (
                         <tr key={l.id} className="hover:bg-slate-950/40 transition">
-                          <td className="p-3.5 font-bold text-white max-w-[180px] truncate">{l.name}</td>
+                          <td className="p-3.5 font-bold text-white max-w-[170px] truncate" title={l.name}>
+                            {l.name}
+                          </td>
                           <td className="p-3.5">{getCategoryBadge(l.category)}</td>
-                          <td className="p-3.5 font-mono text-slate-300">{l.phone || 'N/A'}</td>
-                          <td className="p-3.5 max-w-[160px] truncate">
+                          <td className="p-3.5 max-w-[140px] truncate text-slate-300" title={l.address}>
+                            {l.address || '-'}
+                          </td>
+                          <td className="p-3.5 font-mono text-emerald-400 max-w-[130px] truncate" title={(l.phones || [l.phone]).filter(Boolean).join(', ')}>
+                            {l.phones && l.phones.length > 0 ? l.phones[0] : (l.phone || 'N/A')}
+                          </td>
+                          <td className="p-3.5 text-cyan-400 max-w-[150px] truncate">
+                            {l.email ? (
+                              <a href={`mailto:${l.email}`} className="hover:underline" title={l.email}>
+                                {l.email}
+                              </a>
+                            ) : (
+                              <span className="text-slate-600 italic">-</span>
+                            )}
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              {l.instagram ? (
+                                <a
+                                  href={l.instagram}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title={l.instagram}
+                                  className="text-fuchsia-400 hover:text-fuchsia-300"
+                                >
+                                  <Instagram className="w-3.5 h-3.5" />
+                                </a>
+                              ) : null}
+                              {l.facebook ? (
+                                <a
+                                  href={l.facebook}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title={l.facebook}
+                                  className="text-blue-400 hover:text-blue-300"
+                                >
+                                  <Facebook className="w-3.5 h-3.5" />
+                                </a>
+                              ) : null}
+                              {!l.instagram && !l.facebook && (
+                                <span className="text-slate-600 text-[11px]">-</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3.5 max-w-[130px] truncate">
                             {l.website_url ? (
                               <a
                                 href={l.website_url}
@@ -1079,15 +1466,35 @@ export default function App() {
                               <span className="text-slate-600">-</span>
                             )}
                           </td>
-                          <td className="p-3.5 max-w-[240px] truncate text-slate-400">{l.resumen_critica}</td>
-                          <td className="p-3.5 text-right">
-                            <button
-                              onClick={() => copyToClipboard(l.pitch_mensaje, l.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] transition"
-                            >
-                              {copiedId === l.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              Pitch
-                            </button>
+                          <td className="p-3.5 max-w-[200px] truncate text-slate-400" title={l.resumen_critica}>
+                            {l.resumen_critica}
+                          </td>
+                          <td className="p-3.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => copyToClipboard(buildBusinessCopyText(l), `db-full-${l.id}`)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-800/40 text-[11px] font-semibold transition"
+                                title="Copiar ficha completa del negocio"
+                              >
+                                {copiedId === `db-full-${l.id}` ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-400" /> Copiado
+                                  </>
+                                ) : (
+                                  <>
+                                    <ClipboardCopy className="w-3 h-3 text-cyan-400" /> Ficha
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => copyToClipboard(l.pitch_mensaje, l.id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition"
+                                title="Copiar mensaje pitch"
+                              >
+                                {copiedId === l.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                Pitch
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))

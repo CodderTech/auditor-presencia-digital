@@ -133,11 +133,18 @@ async function main() {
             : chalk.bgCyan.black(' OBSOLETO ');
 
         console.log(`\n${chalk.bold.white(`${idx + 1}. ${lead.name}`)} ${catBadge}`);
-        console.log(`   ${chalk.gray('Tel:')} ${lead.phone || 'N/A'} | ${chalk.gray('Web:')} ${lead.website_url || 'Ninguna'}`);
+        console.log(`   ${chalk.gray('📍 Dirección  :')} ${chalk.white(lead.address || 'N/A')}`);
+        const phonesStr = lead.phones && lead.phones.length > 0 ? lead.phones.join(', ') : (lead.phone || 'N/A');
+        console.log(`   ${chalk.gray('📞 Teléfonos  :')} ${chalk.cyan(phonesStr)}`);
+        console.log(`   ${chalk.gray('✉️ Email      :')} ${lead.email ? chalk.bold.yellow(lead.email) : chalk.dim('No detectado')}`);
+        const igStr = lead.instagram ? chalk.magenta(lead.instagram) : chalk.dim('N/A');
+        const fbStr = lead.facebook ? chalk.blue(lead.facebook) : chalk.dim('N/A');
+        console.log(`   ${chalk.gray('📱 Redes      :')} IG: ${igStr} | FB: ${fbStr}`);
+        console.log(`   ${chalk.gray('🌐 Sitio Web  :')} ${chalk.white(lead.website_url || 'Ninguna')}`);
         if (lead.pagespeed_score !== undefined) {
-          console.log(`   ${chalk.gray('PageSpeed:')} ${lead.pagespeed_score}/100 | ${chalk.gray('LCP:')} ${lead.lcp_seconds}s`);
+          console.log(`   ${chalk.gray('⚡ PageSpeed  :')} ${lead.pagespeed_score}/100 | ${chalk.gray('LCP:')} ${lead.lcp_seconds}s`);
         }
-        console.log(`   ${chalk.gray('Pitch WhatsApp:')} ${chalk.italic.green(`"${lead.pitch_mensaje}"`)}`);
+        console.log(`   ${chalk.gray('💬 Pitch WA   :')} ${chalk.italic.green(`"${lead.pitch_mensaje}"`)}`);
       });
 
       console.log('\n' + chalk.green(`✔ Base de datos SQLite guardada en: ./data/prospector.sqlite`));

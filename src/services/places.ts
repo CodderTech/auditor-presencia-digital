@@ -51,16 +51,20 @@ export class GooglePlacesNewService implements IPlacesService {
       const data = await response.json();
       const rawPlaces = data.places || [];
 
-      return rawPlaces.map((p: any) => ({
-        id: p.id || `place_${Math.random().toString(36).substring(2, 9)}`,
-        name: p.displayName?.text || 'Comercio Local',
-        formatted_address: p.formattedAddress || `${options.location}`,
-        international_phone_number: p.internationalPhoneNumber || p.nationalPhoneNumber || '+54 341 555-0199',
-        website_url: p.websiteUri || undefined,
-        rating: p.rating || 4.2,
-        user_ratings_total: p.userRatingCount || 15,
-        types: p.types || [],
-      }));
+      return rawPlaces.map((p: any) => {
+        const phone = p.internationalPhoneNumber || p.nationalPhoneNumber || '+54 341 555-0199';
+        return {
+          id: p.id || `place_${Math.random().toString(36).substring(2, 9)}`,
+          name: p.displayName?.text || 'Comercio Local',
+          formatted_address: p.formattedAddress || `${options.location}`,
+          international_phone_number: phone,
+          phones: phone ? [phone] : [],
+          website_url: p.websiteUri || undefined,
+          rating: p.rating || 4.2,
+          user_ratings_total: p.userRatingCount || 15,
+          types: p.types || [],
+        };
+      });
     } catch (err: any) {
       console.error(`[Places API Network Error]: ${err.message}. Activando proveedor fallback.`);
       return new FallbackPlacesService().searchBusinesses(options);
@@ -93,6 +97,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: '', // CASO A: Sin Web
         rating: 4.6,
         reviews: 42,
+        email: 'contacto@odontologiasanmartin.com.ar',
+        phones: ['+54 341 425-1020', '+54 9 341 555-0199'],
+        instagram: 'https://instagram.com/odontologia_sanmartin',
+        facebook: 'https://facebook.com/odontologiasanmartin',
       },
       {
         namePrefix: 'Consultorios Dentales',
@@ -102,6 +110,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: 'https://instagram.com/consultorios_dentales_ros', // CASO B: Red Social
         rating: 4.8,
         reviews: 89,
+        email: 'turnos@dentalesbulevar.com',
+        phones: ['+54 341 481-3040', '+54 9 341 622-4411'],
+        instagram: 'https://instagram.com/consultorios_dentales_ros',
+        facebook: 'https://facebook.com/dentalesbulevar',
       },
       {
         namePrefix: 'Clínica Dental Integral',
@@ -111,6 +123,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: 'http://clinica-dental-integral-rosario.tripod.com', // CASO C: Web rota/obsoleta
         rating: 3.9,
         reviews: 14,
+        email: 'info@dentalintegralnorte.com.ar',
+        phones: ['+54 341 430-5500'],
+        instagram: 'https://instagram.com/dentalintegral_norte',
+        facebook: 'https://facebook.com/dentalintegralnorte',
       },
       {
         namePrefix: 'Odontología Especializada',
@@ -120,6 +136,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: 'https://odontologiapellegrini.example.com', // CASO C: Web lenta/sin whatsapp
         rating: 4.1,
         reviews: 28,
+        email: 'recepcion@odontologiapellegrini.com',
+        phones: ['+54 341 440-8899', '+54 9 341 333-7722'],
+        instagram: 'https://instagram.com/odontologia_pellegrini',
+        facebook: 'https://facebook.com/odontologiapellegrini',
       },
       {
         namePrefix: 'Estética Dental & Implantes',
@@ -129,6 +149,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: 'https://linktr.ee/esteticadentalrio', // CASO B: Linktree
         rating: 4.7,
         reviews: 65,
+        email: 'consultas@esteticadentalrio.com.ar',
+        phones: ['+54 341 449-1122', '+54 9 341 511-9988'],
+        instagram: 'https://instagram.com/esteticadentalrio',
+        facebook: 'https://facebook.com/esteticadentalrio',
       },
       {
         namePrefix: 'Instituto Odontológico',
@@ -138,6 +162,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: 'https://instituto-odontologico-moderno.com', // CASO C: Sitio moderno profesional
         rating: 4.9,
         reviews: 130,
+        email: 'hola@instituto-odontologico-moderno.com',
+        phones: ['+54 341 480-7766', '+54 9 341 600-1122'],
+        instagram: 'https://instagram.com/instituto_odontologico_mod',
+        facebook: 'https://facebook.com/institutoodontologicomoderno',
       },
       {
         namePrefix: 'Atención Odontológica',
@@ -147,6 +175,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: '', // CASO A: Sin Web
         rating: 4.0,
         reviews: 55,
+        email: 'urgencias@odontologia24hs.com',
+        phones: ['+54 341 422-9900', '+54 9 341 411-0022'],
+        instagram: 'https://instagram.com/urgencias_odontologicas_24h',
+        facebook: 'https://facebook.com/urgenciasodontologicas24h',
       },
       {
         namePrefix: 'Dres. Martínez & Asoc.',
@@ -156,6 +188,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: 'http://insecure-broken-dental-domain-99.org', // CASO C: Web caída / SSL roto
         rating: 3.8,
         reviews: 19,
+        email: '',
+        phones: ['+54 341 435-4422'],
+        instagram: 'https://instagram.com/dresmartinez_odontologia',
+        facebook: 'https://facebook.com/dresmartinezodontologos',
       },
       {
         namePrefix: 'Dental Care Center',
@@ -165,6 +201,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: 'https://facebook.com/dentalcarecenter' + city.toLowerCase().replace(/[^a-z0-9]/g, ''), // CASO B: Facebook
         rating: 4.3,
         reviews: 37,
+        email: 'info@dentalcarecenter.com.ar',
+        phones: ['+54 341 411-8811', '+54 9 341 788-2233'],
+        instagram: 'https://instagram.com/dentalcarecenter_' + city.toLowerCase().replace(/[^a-z0-9]/g, ''),
+        facebook: 'https://facebook.com/dentalcarecenter' + city.toLowerCase().replace(/[^a-z0-9]/g, ''),
       },
       {
         namePrefix: 'Clínica ProDent',
@@ -174,6 +214,10 @@ export class FallbackPlacesService implements IPlacesService {
         website: 'https://prodent-rosario-vieja.net.ar', // CASO C: Web obsoleta estilo 2012
         rating: 4.2,
         reviews: 31,
+        email: 'contacto@prodent-especialistas.com',
+        phones: ['+54 341 470-6655'],
+        instagram: 'https://instagram.com/prodent_especialistas',
+        facebook: 'https://facebook.com/prodentespecialistas',
       },
     ];
 
@@ -192,13 +236,18 @@ export class FallbackPlacesService implements IPlacesService {
 
       const name = `${titlePrefix} ${template.nameSuffix}${suffix}`;
       const address = `${template.street}, ${location}`;
-      const phone = `${template.phonePrefix}${String(1000 + (i * 37) % 9000).padStart(4, '0')}`;
+      const primaryPhone = `${template.phonePrefix}${String(1000 + (i * 37) % 9000).padStart(4, '0')}`;
+      const phones = [primaryPhone, ...(template.phones || [])].filter((v, idx, arr) => arr.indexOf(v) === idx);
 
       results.push({
         id: `lead_${i + 1}_${Math.random().toString(36).substring(2, 7)}`,
         name,
         formatted_address: address,
-        international_phone_number: phone,
+        international_phone_number: primaryPhone,
+        phones,
+        email: template.email || undefined,
+        instagram: template.instagram || undefined,
+        facebook: template.facebook || undefined,
         website_url: template.website || undefined,
         rating: template.rating,
         user_ratings_total: template.reviews + (i * 3),

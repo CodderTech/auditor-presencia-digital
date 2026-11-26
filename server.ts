@@ -137,6 +137,11 @@ app.post('/api/audit/single', async (req: Request, res: Response) => {
           ? `/api/screenshots/${path.basename(crawlResult.screenshotPath)}`
           : undefined,
       },
+      contacts: {
+        emails: crawlResult.emails || [],
+        phones: crawlResult.phones || [],
+        socialLinks: crawlResult.socialLinks || {},
+      },
       pagespeedResult,
       visionAudit,
       pitch,

@@ -124,6 +124,7 @@ export class B2BProspectorPipeline {
         this.log('warn', `${prefix} 🚫 CASO A: Sin sitio web registrado. Marcado como SIN_WEB.`, 2, biz.id);
       } else if (
         rawUrl.includes('instagram.com') ||
+        rawUrl.includes('instagr.am') ||
         rawUrl.includes('facebook.com') ||
         rawUrl.includes('fb.com') ||
         rawUrl.includes('linktr.ee') ||
@@ -137,6 +138,12 @@ export class B2BProspectorPipeline {
         // CASO B: Solo Red Social
         category = 'SOLO_RED_SOCIAL';
         stats.soloRedSocial++;
+        if (rawUrl.includes('instagram.com') || rawUrl.includes('instagr.am')) {
+          biz.instagram = biz.website_url;
+        }
+        if (rawUrl.includes('facebook.com') || rawUrl.includes('fb.com')) {
+          biz.facebook = biz.website_url;
+        }
         this.log('warn', `${prefix} 📱 CASO B: Enlace apunta a Red Social (${rawUrl}). Marcado como SOLO_RED_SOCIAL.`, 2, biz.id);
       } else {
         // CASO C: Dominio Propio ➔ Pasa a Etapa 3
@@ -155,8 +162,8 @@ export class B2BProspectorPipeline {
         if (this.callbacks.onStageChange) this.callbacks.onStageChange(3, 'Auditoría Técnica y Visión Multimodal con Gemini');
         const slug = `${biz.id}_${biz.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
-        // 1. Captura Headless con Playwright móvil (390x844, 12s timeout)
-        this.log('info', `${prefix} 📸 Capturando screenshot móvil (390x844) con Playwright...`, 3, biz.id);
+        // 1. Captura Headless con Playwright móvil (390x844, 12s timeout) y extracción de contactos
+        this.log('info', `${prefix} 📸 Capturando screenshot móvil y extrayendo emails/redes con Playwright...`, 3, biz.id);
         crawlResult = await this.crawler.captureMobileScreenshot(biz.website_url!, slug);
 
         if (!crawlResult.ok || crawlResult.isDown) {
@@ -193,13 +200,26 @@ export class B2BProspectorPipeline {
               biz.id
             );
             if (this.callbacks.onLeadProcessed) {
+              const emailDesc = (crawlResult?.emails && crawlResult.emails.length > 0) ? crawlResult.emails[0] : (biz.email || '');
+              const igDesc = crawlResult?.socialLinks?.instagram || biz.instagram || '';
+              const fbDesc = crawlResult?.socialLinks?.facebook || biz.facebook || '';
+              const phonesSetDesc = new Set<string>();
+              if (biz.international_phone_number) phonesSetDesc.add(biz.international_phone_number);
+              if (biz.phones) biz.phones.forEach((p) => phonesSetDesc.add(p));
+              if (crawlResult?.phones) crawlResult.phones.forEach((p) => phonesSetDesc.add(p));
+              const phonesListDesc = Array.from(phonesSetDesc);
+
               this.callbacks.onLeadProcessed(
                 {
                   id: biz.id,
                   name: biz.name,
                   category: 'PROFESIONAL_DESCARTAR',
                   address: biz.formatted_address,
-                  phone: biz.international_phone_number || '',
+                  phone: phonesListDesc[0] || biz.international_phone_number || '',
+                  phones: phonesListDesc,
+                  email: emailDesc,
+                  instagram: igDesc,
+                  facebook: fbDesc,
                   website_url: biz.website_url || '',
                   rating: biz.rating || 0,
                   user_ratings_total: biz.user_ratings_total || 0,
@@ -247,12 +267,39 @@ export class B2BProspectorPipeline {
         lcpSeconds: pagespeedResult?.lcpSeconds,
       });
 
+      // Consolidar correo electrónico
+      const finalEmail = (crawlResult?.emails && crawlResult.emails.length > 0)
+        ? crawlResult.emails[0]
+        : (biz.email || '');
+
+      // Consolidar lista de teléfonos
+      const phonesSet = new Set<string>();
+      if (biz.international_phone_number) phonesSet.add(biz.international_phone_number);
+      if (biz.phones) biz.phones.forEach((p) => phonesSet.add(p));
+      if (crawlResult?.phones) crawlResult.phones.forEach((p) => phonesSet.add(p));
+      const phonesList = Array.from(phonesSet);
+      const primaryPhone = phonesList[0] || biz.international_phone_number || '';
+
+      // Consolidar redes sociales (Instagram y Facebook)
+      let finalInstagram = crawlResult?.socialLinks?.instagram || biz.instagram || '';
+      let finalFacebook = crawlResult?.socialLinks?.facebook || biz.facebook || '';
+      if (rawUrl.includes('instagram.com') || rawUrl.includes('instagr.am')) {
+        finalInstagram = biz.website_url || finalInstagram;
+      }
+      if (rawUrl.includes('facebook.com') || rawUrl.includes('fb.com')) {
+        finalFacebook = biz.website_url || finalFacebook;
+      }
+
       const qualifiedLead: QualifiedLead = {
         id: biz.id,
         name: biz.name,
         category: category!,
         address: biz.formatted_address,
-        phone: biz.international_phone_number || '',
+        phone: primaryPhone,
+        phones: phonesList,
+        email: finalEmail || undefined,
+        instagram: finalInstagram || undefined,
+        facebook: finalFacebook || undefined,
         website_url: biz.website_url || '',
         rating: biz.rating || 0,
         user_ratings_total: biz.user_ratings_total || 0,
@@ -276,7 +323,15 @@ export class B2BProspectorPipeline {
       qualifiedLeads.push(qualifiedLead);
       stats.calificadosFinales++;
 
-      this.log('success', `${prefix} ✅ Lead calificado persistido exitosamente en SQLite y CSV.`, 4, biz.id);
+      const contactLogSummary = [
+        `Dirección: ${biz.formatted_address}`,
+        `Tel: ${primaryPhone || 'N/A'}`,
+        finalEmail ? `Email: ${finalEmail}` : 'Email: No detectado',
+        finalInstagram ? `IG: Sí` : 'IG: No',
+        finalFacebook ? `FB: Sí` : 'FB: No',
+      ].join(' | ');
+
+      this.log('success', `${prefix} ✅ Lead calificado persistido exitosamente en SQLite y CSV. (${contactLogSummary})`, 4, biz.id);
 
       if (this.callbacks.onLeadProcessed) {
         this.callbacks.onLeadProcessed(qualifiedLead, false);
